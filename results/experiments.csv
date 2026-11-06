@@ -1,0 +1,7 @@
+model,subset,MAE,RMSE,NASA_score,n_rows,experiment
+Dummy (mean RUL),all val rows,55.363284140368854,65.71544508456086,19351068.755096164,4070,baseline_unclipped_w10
+Dummy (mean RUL),"val rows, RUL <= 145",45.36823996969941,55.418703457873306,10700250.169257794,2909,baseline_unclipped_w10
+Linear Regression,all val rows,29.063023490214746,36.735837391704365,4633087.215303322,4070,baseline_unclipped_w10
+Linear Regression,"val rows, RUL <= 145",25.003637398200855,30.072961559165737,148325.33625651198,2909,baseline_unclipped_w10
+Random Forest,all val rows,21.687118504053547,30.62016943622275,551863.4412123596,4070,baseline_unclipped_w10
+Random Forest,"val rows, RUL <= 145",17.142383761864714,24.932365016001963,348984.58758485375,2909,baseline_unclipped_w10
