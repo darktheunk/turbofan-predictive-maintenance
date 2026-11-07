@@ -149,5 +149,14 @@
     "rul_cap": 130,
     "basis": "5-fold GroupKFold by engine, RF, scored on RUL<=145 rows: cap130 mean MAE 13.99 vs 14.42 (110), 15.24 (150), 20.32 (none)",
     "validation_scored_against": "true unclipped RUL"
+  },
+  "test_evaluation": {
+    "n_engines": 100,
+    "MAE": 9.12,
+    "RMSE": 11.94,
+    "NASA_score": 220.4,
+    "mean_signed_error": -0.1,
+    "config": "14 raw sensors + slope80 + cycle, RUL cap 130, XGBoost, trained on all 100 training engines",
+    "note": "single evaluation of the frozen configuration; test set not used for any modelling decision"
   }
 }

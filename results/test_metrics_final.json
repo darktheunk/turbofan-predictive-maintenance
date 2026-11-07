@@ -1,0 +1,9 @@
+{
+  "n_engines": 100,
+  "MAE": 9.12,
+  "RMSE": 11.94,
+  "NASA_score": 220.4,
+  "mean_signed_error": -0.1,
+  "config": "14 raw sensors + slope80 + cycle, RUL cap 130, XGBoost, trained on all 100 training engines",
+  "note": "single evaluation of the frozen configuration; test set not used for any modelling decision"
+}

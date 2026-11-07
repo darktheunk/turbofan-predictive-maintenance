@@ -2,7 +2,7 @@
 
 Predicting the **Remaining Useful Life (RUL)** of turbofan engines from multivariate sensor time series, using the NASA C-MAPSS **FD001** subset.
 
-**Status:** data understanding, EDA, preprocessing, feature engineering and model development (Phases 1 to 6) are complete. The official test-set evaluation, explainability and final report are still to do. The test set has not been used for any modelling decision.
+**Status:** data understanding, EDA, preprocessing, feature engineering, model development, the official test evaluation and a SHAP explainability analysis (Phases 1 to 8) are complete. The final report and presentation are still to do. The test set was used once, for the frozen configuration, and not for any modelling decision.
 
 ---
 
@@ -44,7 +44,7 @@ turbofan-predictive-maintenance/
 │   ├── 03_data_preprocessing.ipynb
 │   ├── 04_feature_engineering.ipynb
 │   ├── 05_model_training.ipynb
-│   └── 06_model_evaluation.ipynb      (planned, not yet run)
+│   └── 06_model_evaluation.ipynb      (test evaluation and SHAP)
 ├── models/
 ├── results/                 experiment logs, CV tables, ablation tables
 ├── requirements.txt
@@ -99,7 +99,7 @@ All features are computed per engine and look only backward (current and earlier
 
 ## 6. Results so far
 
-All numbers below are from validation (grouped CV or the 20-engine validation split). **None come from the official test set.**
+Sections 6.1 to 6.6 are from validation (grouped CV or the 20-engine validation split) and **none come from the official test set**. Section 6.7 is the single test-set evaluation of the frozen configuration.
 
 ### 6.1 Baseline models (single split, unclipped, rows with RUL <= 145)
 
@@ -167,20 +167,74 @@ The gain levels off at about 80, which was chosen as the smallest window matchin
 
 Note: the window-80 slope features are built inside the notebook code and have not yet been saved to a processed file.
 
+### 6.7 Official test evaluation (frozen configuration, run once)
+
+The frozen model was trained on all 100 training engines. Only the **last observed cycle of each of the 100 test engines** is scored against `RUL_FD001.txt`.
+
+| Metric | Test (100 engines) |
+|---|---|
+| MAE | **9.12** |
+| RMSE | **11.94** |
+| NASA score | **220.4** |
+| Mean signed error (+ = over-predicts life) | -0.1 |
+
+The test MAE is about 1.3 cycles above the CV figure of 7.84. The two are not directly comparable: the test score uses 100 single cutoffs and is noisier, while CV scores every row with RUL <= 145. Many settings were also chosen on the training engines.
+
+Error by how long the test engine was observed:
+
+| Observed cycles | Engines | Mean signed error | MAE |
+|---|---|---|---|
+| 31 to 70 | 14 | +5.1 | 12.2 |
+| 71 to 130 | 31 | +2.0 | 12.2 |
+| 131 to 200 | 47 | -2.1 | 6.4 |
+| over 200 | 8 | -5.7 | 7.7 |
+
+Engines with short observed histories are the weakest. The overall bias of -0.1 hides over-prediction on short histories and under-prediction on long ones. The five largest misses were engines 67, 30, 2, 50 and 45 (errors of +36.5, -32.7, +29.7, +28.8 and -28.8).
+
+### 6.8 Explainability (SHAP, final model)
+
+SHAP values were computed on 3,000 training rows with `TreeExplainer` (the reconstruction check matched the model to 0.00014 cycles). They show what the model relies on, not which component physically fails.
+
+- `cycle` is the most influential feature (mean |SHAP| 10.7 cycles, about 19% of total importance). Its effect is non-monotonic: it pushes predictions up in the first 50 cycles, down around cycles 80 to 130, and fades toward zero after about 150.
+- The slope features carry about 50% of total importance.
+- Per-sensor totals (raw plus slope): `sensor_11` (8.1), `sensor_4` (7.4) and `sensor_12` (5.7) lead, followed by sensors 7, 15, 20, 9, 14 and 17.
+- High values of `sensor_11` and `sensor_4`, and high slopes of `sensor_9` and `sensor_14`, push predicted RUL down. Sensors 9 and 14 matter through their slopes, which supports keeping them.
+
+### 6.9 Lifetime bias
+
+Errors depend on how long an engine lives in total (observed cycles plus true RUL). On the test engines the correlation between error and total lifetime is -0.5.
+
+| Total lifetime | Test engines | Mean signed error | MAE |
+|---|---|---|---|
+| up to 177 | 27 | +9.3 | 11.1 |
+| 178 to 229 | 48 | -1.8 | 7.2 |
+| over 229 | 25 | -6.9 | 10.6 |
+
+Short-lived engines are over-predicted (the dangerous direction) and long-lived ones under-predicted, partly because of the RUL cap of 130. A grouped CV on training engines, with and without `cycle`, showed that `cycle` reduces this bias and the MAE in all three lifetime buckets:
+
+| Total lifetime | Bias with / without `cycle` | MAE with / without `cycle` |
+|---|---|---|
+| up to 177 | +6.8 / +9.8 | 9.8 / 12.9 |
+| 178 to 229 | -1.1 / +1.5 | 7.0 / 8.1 |
+| over 229 | -4.0 / -9.6 | 7.6 / 11.4 |
+
+The pull toward a typical lifetime is therefore regression toward the mean in general, which `cycle` partly corrects, and it is not caused by `cycle`. Total lifetime is only known for engines that ran to failure, so this analysis is diagnostic and not a usable feature.
+
 ## 7. Limitations and caveats
 
-- Many variants were compared on the same 100 engines, so the CV numbers are somewhat optimistic. The official test set is the unbiased check.
+- Many variants were compared on the same 100 engines, so the CV numbers are somewhat optimistic. The official test set was used once for the frozen configuration. Its result is a single run on 100 engines and is therefore noisy.
+- Engines with short observed histories and engines with unusually short or long total lifetimes are predicted less accurately (section 6.7 and 6.9). Short-lived engines are over-predicted on average, which is the dangerous direction for maintenance.
 - It is not yet understood why long slope windows help so much. This is reported as an empirical result.
-- `cycle` helps in CV. It is available at prediction time, but its benefit still has to be confirmed on the official test protocol.
+- `cycle` is the most influential feature and acts as an age prior. It improved CV in all five folds and reduced lifetime bias, and it is available at prediction time, but it is not a physical signal.
 - The rows with RUL <= 145 used for scoring come from the test labels' range.
 - `sensor_6` and the operating settings were not ablated. Hyperparameters were not tuned. LSTM, GRU and 1D CNN have not been tried.
 - FD001 has a single operating condition and fault mode, so results do not transfer to FD002 to FD004 without further work.
 
 ## 8. Remaining work
 
-1. `06_model_evaluation.ipynb`: build the frozen features for the test engines with the same function used for training, train on all 100 training engines, and score **only the last cycle of each test engine** against `RUL_FD001.txt` (MAE, RMSE, NASA score, bias, error by observed length). Run once, report as it comes out, and do not tune on it afterwards.
+1. Optional short-history and lifetime-bias experiment. Design it on training CV only, and report it separately from the frozen test result in section 6.7.
 2. Optional deep learning (LSTM, GRU, 1D CNN) compared against XGBoost.
-3. SHAP and sensor-contribution analysis, actual-versus-predicted plots, a final model comparison table.
+3. Per-engine SHAP examples, a final model comparison table and the actual-versus-predicted plots for the report.
 4. Final report and presentation. Possible extras: inference pipeline or API and a results dashboard.
 
 ## 9. Team
