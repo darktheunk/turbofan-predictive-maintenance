@@ -58,3 +58,6 @@ models/*
 # Derived data (regenerable); keep the config
 data/processed/*
 !data/processed/preprocessing_config.json
+# Derived data (regenerable); keep the config
+data/processed/*
+!data/processed/preprocessing_config.json
